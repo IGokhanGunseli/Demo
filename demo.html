@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ecospend Payment</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts for "Inter" -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 flex items-center justify-center min-h-screen p-4">
+
+    <!-- Main card container for the payment interface -->
+    <div class="bg-white p-8 rounded-xl shadow-2xl max-w-sm w-full text-center">
+
+        <!-- Logo/Company Name at the top -->
+        <div class="mb-8">
+            <h1 class="text-2xl sm:text-3xl font-bold text-gray-800">
+                Ecospend
+            </h1>
+            <p class="text-sm text-gray-500">
+                a Trustly Company
+            </p>
+        </div>
+
+        <!-- Buttons at the bottom -->
+        <div class="flex flex-col space-y-4">
+            <!-- Pay by Bank Button - Replace the href with a new, fresh link from your dashboard -->
+            <a href="https://paylinkv2.sb.ecospend.com/paylink/banks?s=msR1TBhAmSBff" 
+               target="_blank"
+               class="w-full bg-blue-600 text-white font-semibold py-3 px-4 rounded-lg shadow-md hover:bg-blue-700 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                Pay by Bank
+            </a>
+
+            <!-- Connect your Account Button with the specified link -->
+            <a href="https://datalink.sb.ecospend.com/?uid=l77WwufxFtw&sc=35463&ch=3" 
+               target="_blank" 
+               class="w-full bg-white text-blue-600 border border-blue-600 font-semibold py-3 px-4 rounded-lg shadow-md hover:bg-blue-50 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                Connect your Account
+            </a>
+        </div>
+    </div>
+
+</body>
+</html>
