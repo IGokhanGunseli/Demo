@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bank Downtime Logger</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom styles for full-page layout and improved table visibility */
+        body {
+            min-height: 100vh;
+            background-color: #eef2ff;
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        .app-container {
+            /* Full width padding */
+            padding: 2rem 1rem;
+            /* Remove max-width for better use of large screens */
+        }
+        .table-input {
+            width: 100%;
+            padding: 8px;
+            border-radius: 6px;
+            border: 1px solid #d1d5db;
+            transition: all 0.2s;
+        }
+        .table-input:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5);
+            outline: none;
+        }
+        th, td {
+            padding: 12px 8px;
+            vertical-align: top;
+        }
+        .action-button {
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: background-color 0.2s, transform 0.1s;
+        }
+        .action-button:hover {
+            transform: translateY(-1px);
+        }
+        .action-button:active {
+            transform: translateY(0);
+        }
+        
+        /* Multi-Select Tag Styling */
+        .tag {
+            display: inline-flex;
+            align-items: center;
+            background-color: #e0e7ff; /* Indigo-100 */
+            color: #4338ca; /* Indigo-700 */
+            padding: 4px 8px;
+            margin-right: 4px;
+            margin-bottom: 4px;
+            border-radius: 9999px; /* Full rounded corners (pill shape) */
+            font-size: 0.875rem;
+            cursor: default;
+        }
+        .tag-remove {
+            margin-left: 6px;
+            cursor: pointer;
+            color: #6366f1; /* Indigo-500 */
+            font-weight: bold;
+            transition: color 0.1s;
+        }
+        .tag-remove:hover {
+            color: #3730a3; /* Indigo-800 */
+        }
+        .dropdown-list {
+            position: absolute;
+            z-index: 50; /* Increased z-index to ensure visibility above all other content */
+            max-height: 400px; /* Increased max height */
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            background: white;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .dropdown-items-container {
+            padding-bottom: 8px; /* Space below the last item */
+        }
+        .dropdown-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            transition: background-color 0.1s;
+        }
+        .dropdown-item:hover {
+            background-color: #eff6ff; /* Blue-50 */
+        }
+        .dropdown-item.selected {
+            background-color: #bfdbfe; /* Blue-200 */
+            font-weight: 600;
+        }
+        .search-input {
+            padding: 8px 12px !important;
+        }
+    </style>
+</head>
+<body class="p-0">
+
+    <div class="app-container mx-auto w-full md:p-8">
+        <div class="bg-white rounded-xl shadow-2xl p-6 md:p-10">
+            <h1 class="text-3xl font-extrabold text-indigo-700 mb-6 border-b-2 border-indigo-100 pb-3">
+                Downtime Event Log Automation
+            </h1>
+            
+            <!-- Email Text Extraction Section -->
+            <div class="mb-8 border border-gray-200 rounded-xl p-4 bg-gray-50">
+                <h2 class="text-xl font-bold text-gray-700 mb-3 flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8m-2 4v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+                    </svg>
+                    1. Auto-Populate from Email
+                </h2>
+                <textarea id="emailInput" rows="5" class="table-input" placeholder="Paste only the core downtime table data (Start Date, End Date, ASPSP, API, Description) from the email or PDF output here. Avoid headers/footers/signatures."></textarea>
+                <button id="extractButton" onclick="extractAndPopulateRow()"
+                    class="action-button bg-blue-500 hover:bg-blue-600 text-white shadow-lg shadow-blue-200 mt-3 w-full flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                    </svg>
+                    Extract & Populate New Row (via Gemini)
+                </button>
+            </div>
+            
+            <!-- Instructions for Manual Entry -->
+            <h2 class="text-xl font-bold text-gray-700 mb-3 flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                2. Manual Entry & Review
+            </h2>
+            <p class="text-sm text-gray-600 mb-4 bg-yellow-50 p-3 rounded-lg border border-yellow-200">
+                <span class="font-semibold text-yellow-800">Note:</span> **BankGroup** is a dropdown. The **Bank** column uses the tag selector with search. Click **✨ Draft Description** to generate content manually.
+            </p>
+
+            <!-- The Main Data Table -->
+            <div class="overflow-x-auto">
+                <table id="downtimeTable" class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-indigo-50 sticky top-0">
+                        <tr class="text-xs font-medium text-gray-700 uppercase tracking-wider">
+                            <th class="py-3 px-2 text-left min-w-[150px]">BankGroup</th>
+                            <th class="py-3 px-2 text-left min-w-[350px]">Bank (Tag Selector & Search)</th>
+                            <th class="py-3 px-2 text-left min-w-[100px]">Schedule</th>
+                            <th class="py-3 px-2 text-left min-w-[120px]">Subscribers</th>
+                            <th class="py-3 px-2 text-left min-w-[150px]">NotificationDate</th>
+                            <th class="py-3 px-2 text-left min-w-[200px]">StartDate (MM/DD/YYYY HH:MM AM/PM)</th>
+                            <th class="py-3 px-2 text-left min-w-[200px]">EndDate (MM/DD/YYYY HH:MM AM/PM)</th>
+                            <th class="py-3 px-2 text-left min-w-[150px]">Severity</th>
+                            <th class="py-3 px-2 text-left w-full min-w-[300px]">Content (Description)</th>
+                            <th class="py-3 px-2 text-center w-12">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100" id="tableBody">
+                        <!-- Rows will be injected here -->
+                    </tbody>
+                </table>
+            </div>
+    
+            <!-- Action Buttons -->
+            <div class="mt-8 flex justify-end items-center">
+                <button onclick="addRow()"
+                    class="action-button bg-green-500 hover:bg-green-600 text-white shadow-lg shadow-green-200 mr-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                    </svg>
+                    Add Empty Row
+                </button>
+                <button onclick="exportCSV()"
+                    class="action-button bg-indigo-600 hover:bg-indigo-700 text-white shadow-xl shadow-indigo-300">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Export to CSV
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Gemini API Setup ---
+        const apiKey = ""; // Leave this as-is for Canvas environment
+        const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+
+        // --- JSON Schema for Email Extraction ---
+        const EXTRACTION_SCHEMA = {
+            type: "OBJECT",
+            properties: {
+                bankGroup: { type: "STRING", description: "The most appropriate Bank Group name from the provided list that matches the email's content." },
+                banks: { type: "ARRAY", items: { type: "STRING" }, description: "A list of all individual bank/service names impacted by the downtime, extracted directly from the email." },
+                startDate: { type: "STRING", description: "The exact start date and time of the downtime, formatted as MM/DD/YYYY HH:MM AM/PM." },
+                endDate: { type: "STRING", description: "The exact end date and time of the downtime, formatted as MM/DD/YYYY HH:MM AM/PM." },
+                // *** MODIFIED DESCRIPTION TO PREVENT SUMMARIZATION ***
+                content: { type: "STRING", description: "The full, exact text from the 'Description' column of the downtime table. Do not summarize this text, return it verbatim." }
+            },
+            required: ["bankGroup", "banks", "startDate", "endDate", "content"]
+        };
+
+
+        // --- Bank Group List for Dropdown ---
+        const BANK_GROUP_LIST = [
+            "AIB (NI)", "Adam&Company", "Allied Irish Bank GB", "Alpha FX", "Arbuthnot Latham", 
+            "Bank Of Ireland", "Bank Of Scotland", "Barclays", "C. Hoare & Co.", "Capital One", 
+            "Cashplus", "Cater Allen", "Chase", "Chelsea Building Society", "Clydesdale", 
+            "Coutts", "Cumberland", "Cynergy Bank", "Danske", "EBS", "First Direct", 
+            "Halifax", "Handelsbanken", "HSBC", "ICICI Bank UK", "Investec", "Kleinwort Hambros", 
+            "Lloyds", "M&S Bank", "Mettle", "Monzo", "Nationwide Building Society", "NatWest", 
+            "Revolut", "Royal Bank of Scotland", "Santander", "Silicon Valley Bank", "Smile", 
+            "Starling", "Tesco", "The Co-operative Bank", "Tide", "TSB Bank", "Ulster Bank", 
+            "Virgin Money", "Wise", "Yorkshire", "Yorkshire Building Society", "Zempler"
+        ].sort(); 
+
+        // --- Fixed Bank List for Multi-Select ---
+        const BANK_LIST_FOR_MULTISELECT = [
+            "AIB (NI) Corporate", "AIB (NI) Personal", "Adam&Company", "Alpha FX",
+            "Allied Irish Bank GB Corporate", "Allied Irish Bank GB Personal", "Arbuthnot Latham & Co., Limited",
+            "Bank Of Ireland 365 Online UK", "Bank Of Ireland Business On Line", "Bank Of Scotland Business",
+            "Bank Of Scotland Commercial", "Bank Of Scotland Personal", "Barclaycard", "Barclaycard Mobile",
+            "Barclays", "Barclays Business", "Barclays Business Mobile", "Barclays Corporate", "Barclays Mobile",
+            "Barclays Wealth", "Barclays Wealth Mobile", "C. Hoare & Co.", "Capital One", "Cashplus",
+            "Cater Allen", "Chase", "Chelsea Building Society", "Clydesdale", "Coutts", "Cumberland",
+            "Cynergy Bank", "Danske", "Danske Business", "Danske Business ROI", "EBS ROI", "First Direct",
+            "Halifax", "Handelsbanken", "HSBC", "HSBC Business", "HSBC Kinetic", "HSBCnet", "ICICI Bank UK",
+            "Investec", "Kleinwort Hambros", "Lloyds Business", "Lloyds Commercial", "Lloyds Personal",
+            "M&S Bank", "Mettle", "Monzo", "Nationwide Building Society", "NatWest Bankline", "NatWest International EQ",
+            "NatWest International Online and Mobile Banking", "NatWest Online and Mobile Banking", "RBS Bankline",
+            "RBS International EQ", "RBS Online and Mobile Banking", "Revolut", "Santander", "Silicon Valley Bank",
+            "Smile", "Starling", "Starling (Old Version)", "Tesco", "The Co-operative Bank Business",
+            "The Co-operative Bank Personal", "Tide", "TSB Bank", "Ulster Bank NI Anytime Internet Banking",
+            "Ulster Bank NI Bankline", "Ulster Bank RoI", "Virgin Money", "Wise", "Yorkshire",
+            "Yorkshire Building Society", "Zempler"
+        ].sort();
+
+        // --- Multi-Select Logic ---
+        const rowSelections = new Map(); 
+
+        /**
+         * Filters the list of banks based on the search term.
+         * @param {HTMLInputElement} searchInput - The input element containing the search term.
+         */
+        function filterBankList(searchInput) {
+            const row = searchInput.closest('tr');
+            const searchTerm = searchInput.value.toLowerCase();
+            const itemsContainer = row.querySelector('.dropdown-items-container'); 
+            const items = itemsContainer.querySelectorAll('.dropdown-item');
+
+            items.forEach(item => {
+                const bankName = item.dataset.bankName.toLowerCase();
+                if (bankName.includes(searchTerm)) {
+                    item.classList.remove('hidden');
+                } else {
+                    item.classList.add('hidden');
+                }
+            });
+        }
+
+
+        /**
+         * Selects a bank name in the given row, updates the tags, and updates the hidden value.
+         * @param {HTMLElement} row - The table row element.
+         * @param {string} bankName - The bank name to select.
+         */
+        function selectBank(row, bankName) {
+            let selected = rowSelections.get(row) || [];
+            
+            if (selected.includes(bankName)) return; 
+            
+            selected.push(bankName);
+            rowSelections.set(row, selected);
+            
+            renderTags(row, selected);
+            updateHiddenInputValue(row, selected);
+            
+            const listItem = row.querySelector(`.dropdown-item[data-bank-name="${bankName}"]`);
+            if (listItem) listItem.classList.add('selected');
+        }
+
+        /**
+         * Selects multiple banks at once (used for automatic population).
+         * @param {HTMLElement} row - The table row element.
+         * @param {string[]} bankNames - Array of bank names to select.
+         */
+        function selectMultipleBanks(row, bankNames) {
+            let selected = rowSelections.get(row) || [];
+            
+            bankNames.forEach(bankName => {
+                if (!selected.includes(bankName)) {
+                    selected.push(bankName);
+                    
+                    const listItem = row.querySelector(`.dropdown-item[data-bank-name="${bankName}"]`);
+                    if (listItem) listItem.classList.add('selected');
+                }
+            });
+
+            rowSelections.set(row, selected);
+            renderTags(row, selected);
+            updateHiddenInputValue(row, selected);
+        }
+
+        /**
+         * Removes a bank name from the selection in the given row.
+         * @param {HTMLElement} row - The table row element.
+         * @param {string} bankName - The bank name to remove.
+         */
+        function removeBank(row, bankName) {
+            let selected = rowSelections.get(row) || [];
+            
+            const newSelected = selected.filter(name => name !== bankName);
+            rowSelections.set(row, newSelected);
+
+            renderTags(row, newSelected);
+            updateHiddenInputValue(row, newSelected);
+            
+            const listItem = row.querySelector(`.dropdown-item[data-bank-name="${bankName}"]`);
+            if (listItem) listItem.classList.remove('selected');
+        }
+
+        /**
+         * Renders the pill-style tags based on the current selection.
+         * @param {HTMLElement} row - The table row element.
+         * @param {string[]} selected - Array of currently selected bank names.
+         */
+        function renderTags(row, selected) {
+            const tagContainer = row.querySelector('.tag-container');
+            const promptSpan = row.querySelector('.select-bank-prompt');
+            if (!tagContainer || !promptSpan) return;
+
+            tagContainer.innerHTML = selected.map(name => `
+                <div class="tag" data-bank-name="${name}">
+                    ${name}
+                    <span class="tag-remove" onclick="handleRemoveTag(this, '${name}')">&times;</span>
+                </div>
+            `).join('');
+
+            // Hide or show the prompt based on selection count
+            promptSpan.classList.toggle('hidden', selected.length > 0);
+        }
+        
+        /**
+         * Handler for the remove (x) button on a tag.
+         * @param {HTMLElement} element - The clicked element.
+         * @param {string} bankName - The bank name to remove.
+         */
+        function handleRemoveTag(element, bankName) {
+            const row = element.closest('tr');
+            if (row) {
+                removeBank(row, bankName);
+            }
+        }
+        
+        /**
+         * Updates the hidden input field with the semicolon-separated string.
+         * @param {HTMLElement} row - The table row element.
+         * @param {string[]} selected - Array of currently selected bank names.
+         */
+        function updateHiddenInputValue(row, selected) {
+            const hiddenInput = row.querySelector('input.downtime-input[data-column="Bank"]');
+            if (hiddenInput) {
+                // Join with semicolon and NO space, as requested
+                hiddenInput.value = selected.join(';'); 
+            }
+        }
+
+        /**
+         * Toggles the visibility of the bank dropdown list.
+         * @param {HTMLElement} inputElement - The element clicked (the display input).
+         */
+        function toggleDropdown(inputElement) {
+            const selectorContainer = inputElement.closest('[data-bank-selector-cell]');
+            if (!selectorContainer) return;
+            
+            const dropdown = selectorContainer.querySelector('.dropdown-list');
+            const searchInput = selectorContainer.querySelector('.search-input');
+            
+            document.querySelectorAll('.dropdown-list').forEach(d => {
+                if (d !== dropdown) d.classList.add('hidden');
+            });
+
+            dropdown.classList.toggle('hidden');
+
+            if (!dropdown.classList.contains('hidden')) {
+                searchInput.value = '';
+                filterBankList(searchInput); 
+                searchInput.focus();
+            }
+        }
+        
+        /**
+         * Sets up the necessary event listeners for the multi-select box in a new row.
+         * @param {HTMLElement} newRow - The newly created row element.
+         */
+        function initializeMultiSelect(newRow) {
+            const bankCell = newRow.querySelector('[data-bank-selector-cell]');
+            const dropdown = newRow.querySelector('.dropdown-list');
+            
+            if (!bankCell || !dropdown) return;
+
+            dropdown.addEventListener('click', (e) => {
+                const item = e.target.closest('.dropdown-item');
+                if (item && !item.classList.contains('hidden')) { 
+                    const bankName = item.dataset.bankName;
+                    if (item.classList.contains('selected')) {
+                        removeBank(newRow, bankName);
+                    } else {
+                        selectBank(newRow, bankName);
+                    }
+                }
+            });
+
+            document.addEventListener('click', (e => {
+                if (!bankCell.contains(e.target) && !dropdown.contains(e.target)) {
+                    if (!e.target.classList.contains('search-input')) {
+                        dropdown.classList.add('hidden');
+                    }
+                }
+            }), true);
+        }
+        
+        // --- Gemini API Call Functions ---
+
+        /**
+         * Executes the Gemini API call with exponential backoff for reliability.
+         * @param {object} payload - The API request payload.
+         * @param {boolean} isJson - If true, expects a JSON response.
+         * @param {number} retries - Current retry count.
+         * @returns {Promise<any>} The generated text content (or parsed JSON object).
+         */
+        async function callGeminiAPI(payload, isJson = false, retries = 0) {
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (response.status === 429 && retries < 5) { // Too Many Requests, retry
+                    const delay = Math.pow(2, retries) * 1000;
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    return callGeminiAPI(payload, isJson, retries + 1);
+                }
+
+                if (!response.ok) {
+                    const errorBody = await response.text();
+                    throw new Error(`API call failed: ${response.status} - ${errorBody}`);
+                }
+
+                const result = await response.json();
+                const part = result.candidates?.[0]?.content?.parts?.[0];
+                
+                if (!part || !part.text) {
+                     throw new Error("Gemini returned an empty response.");
+                }
+
+                if (isJson) {
+                    return JSON.parse(part.text);
+                }
+                
+                return part.text;
+
+            } catch (error) {
+                console.error("Error in Gemini API call:", error);
+                throw new Error("Failed to generate content. Check console for details.");
+            }
+        }
+
+        /**
+         * Gathers row data and calls Gemini to draft the downtime description.
+         * @param {HTMLElement} buttonElement - The button that was clicked.
+         */
+        async function draftContent(buttonElement) {
+            const originalText = buttonElement.innerHTML;
+            const row = buttonElement.closest('tr');
+            const contentTextarea = row.querySelector('textarea.downtime-input[data-column="Content"]');
+            
+            // Collect data from the row
+            const bankGroup = row.querySelector('[data-column="BankGroup"]').value;
+            const banks = row.querySelector('input.downtime-input[data-column="Bank"]').value;
+            const startDate = row.querySelector('[data-column="StartDate"]').value;
+            const endDate = row.querySelector('[data-column="EndDate"]').value;
+            const subscribers = row.querySelector('[data-column="Subscribers"]').value;
+            
+            if (!bankGroup || !banks || !startDate || !endDate || !subscribers || banks === "") {
+                contentTextarea.value = "Drafting Error: Please ensure BankGroup, Bank(s), StartDate, EndDate, and Subscribers are all selected/filled before drafting.";
+                return;
+            }
+
+            try {
+                // 1. Set Loading State
+                buttonElement.disabled = true;
+                buttonElement.classList.add('opacity-50', 'cursor-not-allowed');
+                buttonElement.innerHTML = `<svg class="animate-spin h-4 w-4 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> Drafting...`;
+
+                // 2. Construct Prompt
+                // Note: The system prompt here is for *generating* content, so 'concise' is appropriate
+                const systemPrompt = "You are an expert IT Operations analyst. Your task is to write a concise, professional, and factual planned downtime notification description for internal stakeholders. Focus on who is impacted, the scope of the maintenance, and the timeline. Do not use any markdown formatting, just plain text.";
+                
+                const userQuery = `Draft a planned downtime notification based on the following data:
+                - Bank Group: ${bankGroup}
+                - Affected Banks/Services: ${banks.split(';').join(', ')}
+                - Subscribers Impacted: ${subscribers}
+                - Start Time: ${startDate}
+                - End Time: ${endDate}
+                
+                Start the description with the phrase 'Planned Maintenance Notification:'.`;
+
+                const payload = {
+                    contents: [{ parts: [{ text: userQuery }] }],
+                    systemInstruction: { parts: [{ text: systemPrompt }] },
+                };
+
+                // 3. Call API
+                const generatedText = await callGeminiAPI(payload, false);
+
+                // 4. Inject Result
+                contentTextarea.value = generatedText;
+
+            } catch (error) {
+                contentTextarea.value = `Error generating content: ${error.message}`;
+            } finally {
+                // 5. Reset Button State
+                buttonElement.disabled = false;
+                buttonElement.classList.remove('opacity-50', 'cursor-not-allowed');
+                buttonElement.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.3 1.028A1 1 0 0112 2v2.243l.536.429 2.404-1.393a.5.5 0 01.758.46V15.5a.5.5 0 01-.758.46l-2.404-1.393L12 14.757V18a1 1 0 01-1.772.639L4.316 11.23a1 1 0 010-1.298L10.228 1.361A1 1 0 0111.3 1.028z" clip-rule="evenodd" /></svg> ✨ Draft Description`;
+            }
+        }
+        
+        /**
+         * Parses email text to extract structured data and populate a new row.
+         */
+        async function extractAndPopulateRow() {
+            const emailInput = document.getElementById('emailInput');
+            const buttonElement = document.getElementById('extractButton');
+            const emailText = emailInput.value.trim();
+
+            if (!emailText) {
+                alert("Please paste the email content into the text box first.");
+                return;
+            }
+
+            try {
+                // 1. Set Loading State
+                buttonElement.disabled = true;
+                buttonElement.classList.add('opacity-50', 'cursor-not-allowed');
+                buttonElement.innerHTML = `<svg class="animate-spin h-5 w-5 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> Extracting Data...`;
+                
+                // 2. Construct Prompt for JSON Extraction
+                const bankGroupsListString = BANK_GROUP_LIST.join(', ');
+
+                const systemPrompt = `You are a sophisticated data parser. Your task is to analyze the provided table or structured text block and extract the required downtime details into a structured JSON object. 
+                
+                Use the following strict rules:
+                1. Bank Group: MUST be one of the following groups: ${bankGroupsListString}. Find the best fit based on the ASPSP/Bank name.
+                2. Banks: MUST be returned as an array of strings, using the ASPSP name from the table (e.g., 'HSBC UK Bank Plc').
+                3. StartDate and EndDate: MUST be parsed from the 'Start Date' and 'End Date' columns into the exact format MM/DD/YYYY HH:MM AM/PM. Assume midnight (12:00 AM) if time is missing.
+                4. Content: MUST be the exact, complete text from the 'Description' column. DO NOT summarize or shorten this content.`; // *** UPDATED RULE ***
+
+                const userQuery = `Extract the following details from the structured downtime summary text below and return them ONLY as a JSON object: bankGroup, banks, startDate, endDate, and content.
+
+                STRUCTURED DOWNTIME SUMMARY TEXT (ASPSP is equivalent to Bank Name):
+                ---
+                ${emailText}
+                ---
+                `;
+
+                const payload = {
+                    contents: [{ parts: [{ text: userQuery }] }],
+                    generationConfig: {
+                        responseMimeType: "application/json",
+                        responseSchema: EXTRACTION_SCHEMA,
+                    },
+                    systemInstruction: { parts: [{ text: systemPrompt }] },
+                };
+
+                // 3. Call API for JSON
+                const extractedData = await callGeminiAPI(payload, true);
+
+                // 4. Populate a New Row
+                const newRow = addRow(extractedData);
+                
+                // 5. Clear the input area
+                emailInput.value = '';
+
+                // Optional: Scroll to the new row
+                newRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+            } catch (error) {
+                alert(`Extraction failed. Review the text you pasted to ensure it contains a clean data block, then try again.\nError: ${error.message}`);
+            } finally {
+                // 6. Reset Button State
+                buttonElement.disabled = false;
+                buttonElement.classList.remove('opacity-50', 'cursor-not-allowed');
+                buttonElement.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>Extract & Populate New Row (via Gemini)`;
+            }
+        }
+
+
+        // --- Table Management Functions ---
+        
+        let rowIndexCounter = 0; // Global counter for unique IDs
+
+        /**
+         * Creates the HTML structure for the 'BankGroup' dropdown input.
+         * @returns {string} The HTML string for the bank group select.
+         */
+        function createBankGroupInputHTML(defaultValue = '') {
+            const optionsHtml = BANK_GROUP_LIST.map(name => 
+                `<option value="${name}" ${name === defaultValue ? 'selected' : ''}>${name}</option>`
+            ).join('');
+
+            return `
+                <select class="table-input downtime-input" data-column="BankGroup" required>
+                    <option value="" disabled ${defaultValue === '' ? 'selected' : ''}>-- Select Bank Group --</option>
+                    ${optionsHtml}
+                </select>
+            `;
+        }
+
+
+        /**
+         * Creates the HTML structure for the 'Bank' multi-select selector WITH search.
+         * @returns {string} The HTML string for the bank selector cell.
+         */
+        function createBankInputHTML() {
+            // List items for the dropdown
+            const optionsHtml = BANK_LIST_FOR_MULTISELECT.map(name => 
+                `<div class="dropdown-item" data-bank-name="${name}">${name}</div>`
+            ).join('');
+
+            return `
+                <div class="relative w-full" data-bank-selector-cell>
+                    <!-- Hidden input to store the final semicolon-separated string for CSV export -->
+                    <input type="hidden" class="downtime-input" data-column="Bank" value="" required>
+
+                    <!-- Display area for selected tags and input/click area -->
+                    <div class="table-input flex flex-wrap items-center min-h-[44px] cursor-pointer" onclick="toggleDropdown(this)">
+                        <div class="tag-container flex flex-wrap items-center">
+                            <!-- Tags will be injected here by renderTags() -->
+                        </div>
+                        <span class="text-gray-400 text-sm ml-1 select-bank-prompt">Select Bank(s)...</span>
+                    </div>
+
+                    <!-- Dropdown List Container -->
+                    <div class="dropdown-list hidden absolute w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg">
+                        <!-- Search Input (Sticky Header) -->
+                        <div class="p-2 border-b border-gray-200 sticky top-0 bg-white z-10">
+                            <input type="text" 
+                                class="search-input table-input w-full p-2" 
+                                placeholder="Search banks..."
+                                oninput="filterBankList(this)">
+                        </div>
+                        <!-- Dropdown Items Container (Scrollable) -->
+                        <div class="dropdown-items-container">
+                            ${optionsHtml}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        /**
+         * Creates the HTML structure for the 'Content' textarea with the Gemini button.
+         * @returns {string} The HTML string for the content area.
+         */
+        function createContentInputHTML(defaultValue = '') {
+            return `
+                <div class="flex flex-col space-y-2">
+                    <textarea rows="2" class="table-input downtime-input" data-column="Content" placeholder="Detailed description of downtime..." required>${defaultValue}</textarea>
+                    <button onclick="draftContent(this)"
+                        class="action-button bg-purple-500 hover:bg-purple-600 text-white text-sm py-2 px-3 shadow-md rounded-md flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M11.3 1.028A1 1 0 0112 2v2.243l.536.429 2.404-1.393a.5.5 0 01.758.46V15.5a.5.5 0 01-.758.46l-2.404-1.393L12 14.757V18a1 1 0 01-1.772.639L4.316 11.23a1 1 0 010-1.298L10.228 1.361A1 1 0 0111.3 1.028z" clip-rule="evenodd" />
+                        </svg>
+                        ✨ Draft Description
+                    </button>
+                </div>
+            `;
+        }
+
+        /**
+         * Creates a new table row with all necessary inputs.
+         * @param {object | null} initialData - Optional object to pre-fill the row.
+         * @returns {HTMLElement} The newly created row element.
+         */
+        function addRow(initialData = null) {
+            const tbody = document.getElementById('tableBody');
+            const newRow = document.createElement('tr');
+            newRow.classList.add('hover:bg-gray-50', 'bg-white');
+            
+            rowIndexCounter++; 
+            
+            const bankGroupValue = initialData ? initialData.bankGroup : '';
+            const startDateValue = initialData ? initialData.startDate : '';
+            const endDateValue = initialData ? initialData.endDate : '';
+            const contentValue = initialData ? initialData.content : '';
+
+
+            newRow.innerHTML = `
+                <!-- BankGroup (Dropdown Select) -->
+                <td>
+                    ${createBankGroupInputHTML(bankGroupValue)}
+                </td>
+                
+                <!-- Bank (Multi-Select Tag Selector) -->
+                <td>${createBankInputHTML()}</td>
+                
+                <!-- Schedule (Fixed: Planned) -->
+                <td><input type="text" class="table-input downtime-input bg-gray-100" data-column="Schedule" value="Planned" readonly></td>
+                
+                <!-- Subscribers (Dropdown: AIS, PIS, ALL) -->
+                <td>
+                    <select class="table-input downtime-input" data-column="Subscribers" required>
+                        <option value="" disabled selected>-- Select --</option>
+                        <option value="AIS">AIS</option>
+                        <option value="PIS">PIS</option>
+                        <option value="ALL">ALL</option>
+                    </select>
+                </td>
+                
+                <!-- NotificationDate (Fixed: Blank) -->
+                <td><input type="text" class="table-input downtime-input bg-gray-100" data-column="NotificationDate" value="" readonly></td>
+                
+                <!-- StartDate (User Input: Date/Time) -->
+                <td><input type="text" class="table-input downtime-input" data-column="StartDate" placeholder="10/1/2026 10:00 PM" value="${startDateValue}" required></td>
+                
+                <!-- EndDate (User Input: Date/Time) -->
+                <td><input type="text" class="table-input downtime-input" data-column="EndDate" placeholder="10/1/2026 10:00 PM" value="${endDateValue}" required></td>
+                
+                <!-- Severity (Fixed: CompletelyDown) -->
+                <td><input type="text" class="table-input downtime-input bg-gray-100" data-column="Severity" value="CompletelyDown" readonly></td>
+                
+                <!-- Content (User Input: Long Text with Gemini Button) -->
+                <td>${createContentInputHTML(contentValue)}</td>
+
+                <!-- Actions (Delete Button) -->
+                <td class="text-center">
+                    <button onclick="deleteRow(this)" class="p-2 text-red-500 hover:text-red-700 transition duration-150 rounded-full hover:bg-red-50" title="Delete Row">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 10-2 0v6a1 1 0 102 0V8z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                </td>
+            `;
+            tbody.appendChild(newRow);
+            
+            initializeMultiSelect(newRow);
+
+            // Populate multi-select if initialData is provided
+            if (initialData && initialData.banks && initialData.banks.length > 0) {
+                selectMultipleBanks(newRow, initialData.banks);
+            }
+
+            return newRow;
+        }
+
+        /**
+         * Deletes the parent row of the clicked button.
+         * @param {HTMLButtonElement} buttonElement - The delete button element.
+         */
+        function deleteRow(buttonElement) {
+            const row = buttonElement.closest('tr');
+            if (row) {
+                rowSelections.delete(row); 
+                row.remove();
+            }
+        }
+
+        /**
+         * Collects all data from the table and exports it as a CSV file.
+         */
+        function exportCSV() {
+            const tableBody = document.getElementById('tableBody');
+            const rows = tableBody.querySelectorAll('tr');
+
+            if (rows.length === 0) {
+                alert("No data to export.");
+                return;
+            }
+
+            // 1. Define CSV Header (must match user requirements and column order)
+            const headers = [
+                "BankGroup", "Bank", "Schedule", "Subscribers", "NotificationDate", 
+                "StartDate", "EndDate", "Severity", "Content"
+            ];
+            let csvContent = headers.join(",") + "\n";
+
+            // 2. Data Collection Loop
+            rows.forEach(row => {
+                const rowData = {};
+                
+                // Get all inputs/selects in the current row
+                const inputs = row.querySelectorAll('.downtime-input');
+
+                inputs.forEach(input => {
+                    const column = input.dataset.column;
+                    let value = input.value;
+                    
+                    // Sanitize values for CSV: double up double quotes, and enclose the whole string in quotes
+                    value = String(value).replace(/"/g, '""'); 
+                    rowData[column] = `"${value}"`;
+                });
+
+                // 3. Construct CSV Row in the correct order
+                const rowValues = headers.map(header => rowData[header] || ""); 
+                csvContent += rowValues.join(",") + "\n";
+            });
+
+            // 4. Trigger Download
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            if (link.download !== undefined) { 
+                const url = URL.createObjectURL(blob);
+                link.setAttribute("href", url);
+                link.setAttribute("download", "bank_downtime_log_" + new Date().toISOString().slice(0, 10) + ".csv");
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url); 
+            }
+        }
+
+        // Initialize the table with one empty row on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            addRow();
+        });
+
+    </script>
+</body>
+</html>
