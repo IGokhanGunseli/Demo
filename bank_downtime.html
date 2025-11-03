@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bank Downtime Logger</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom styles for full-page layout and improved table visibility */
+        body {
+            min-height: 100vh;
+            background-color: #eef2ff;
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        .app-container {
+            /* Full width padding */
+            padding: 2rem 1rem;
+            /* Remove max-width for better use of large screens */
+        }
+        .table-input {
+            width: 100%;
+            padding: 8px;
+            border-radius: 6px;
+            border: 1px solid #d1d5db;
+            transition: all 0.2s;
+        }
+        .table-input:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5);
+            outline: none;
+        }
+        th, td {
+            padding: 12px 8px;
+            vertical-align: top;
+        }
+        .action-button {
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: background-color 0.2s, transform 0.1s;
+        }
+        .action-button:hover {
+            transform: translateY(-1px);
+        }
+        .action-button:active {
+            transform: translateY(0);
+        }
+        
+        /* Multi-Select Tag Styling */
+        .tag {
+            display: inline-flex;
+            align-items: center;
+            background-color: #e0e7ff; /* Indigo-100 */
+            color: #4338ca; /* Indigo-700 */
+            padding: 4px 8px;
+            margin-right: 4px;
+            margin-bottom: 4px;
+            border-radius: 9999px; /* Full rounded corners (pill shape) */
+            font-size: 0.875rem;
+            cursor: default;
+        }
+        .tag-remove {
+            margin-left: 6px;
+            cursor: pointer;
+            color: #6366f1; /* Indigo-500 */
+            font-weight: bold;
+            transition: color 0.1s;
+        }
+        .tag-remove:hover {
+            color: #3730a3; /* Indigo-800 */
+        }
+        .dropdown-list {
+            position: absolute;
+            z-index: 50; /* Increased z-index to ensure visibility above all other content */
+            max-height: 400px; /* Increased max height */
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            background: white;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .dropdown-items-container {
+            padding-bottom: 8px; /* Space below the last item */
+        }
+        .dropdown-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            transition: background-color 0.1s;
+        }
+        .dropdown-item:hover {
+            background-color: #eff6ff; /* Blue-50 */
+        }
+        .dropdown-item.selected {
+            background-color: #bfdbfe; /* Blue-200 */
+            font-weight: 600;
+        }
+        .search-input {
+            padding: 8px 12px !important;
+        }
+    </style>
+</head>
+<body class="p-0">
+
+    <div class="app-container mx-auto w-full md:p-8">
+        <div class="bg-white rounded-xl shadow-2xl p-6 md:p-10">
+            <h1 class="text-3xl font-extrabold text-indigo-700 mb-6 border-b-2 border-indigo-100 pb-3">
+                Downtime Event Log Automation
+            </h1>
+            
+            <!-- Instructions for Multi-Select -->
+            <p class="text-sm text-gray-600 mb-4 bg-yellow-50 p-3 rounded-lg border border-yellow-200">
+                <span class="font-semibold text-yellow-800">Note:</span> **BankGroup** is now a dropdown. The **Bank** column still uses the tag selector with search functionality.
+            </p>
+
+            <!-- The Main Data Table -->
+            <div class="overflow-x-auto">
+                <table id="downtimeTable" class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-indigo-50 sticky top-0">
+                        <tr class="text-xs font-medium text-gray-700 uppercase tracking-wider">
+                            <th class="py-3 px-2 text-left min-w-[150px]">BankGroup</th>
+                            <th class="py-3 px-2 text-left min-w-[350px]">Bank (Tag Selector & Search)</th>
+                            <th class="py-3 px-2 text-left min-w-[100px]">Schedule</th>
+                            <th class="py-3 px-2 text-left min-w-[120px]">Subscribers</th>
+                            <th class="py-3 px-2 text-left min-w-[150px]">NotificationDate</th>
+                            <th class="py-3 px-2 text-left min-w-[200px]">StartDate (MM/DD/YYYY HH:MM AM/PM)</th>
+                            <th class="py-3 px-2 text-left min-w-[200px]">EndDate (MM/DD/YYYY HH:MM AM/PM)</th>
+                            <th class="py-3 px-2 text-left min-w-[150px]">Severity</th>
+                            <th class="py-3 px-2 text-left w-full min-w-[300px]">Content (Description)</th>
+                            <th class="py-3 px-2 text-center w-12">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100" id="tableBody">
+                        <!-- Rows will be injected here -->
+                    </tbody>
+                </table>
+            </div>
+    
+            <!-- Action Buttons -->
+            <div class="mt-8 flex justify-between items-center">
+                <button onclick="addRow()"
+                    class="action-button bg-green-500 hover:bg-green-600 text-white shadow-lg shadow-green-200">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                    </svg>
+                    Add Row
+                </button>
+                <button onclick="exportCSV()"
+                    class="action-button bg-indigo-600 hover:bg-indigo-700 text-white shadow-xl shadow-indigo-300">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Export to CSV
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Bank Group List for Dropdown (New) ---
+        const BANK_GROUP_LIST = [
+            "AIB (NI)", "Adam&Company", "Allied Irish Bank GB", "Alpha FX", "Arbuthnot Latham", 
+            "Bank Of Ireland", "Bank Of Scotland", "Barclays", "C. Hoare & Co.", "Capital One", 
+            "Cashplus", "Cater Allen", "Chase", "Chelsea Building Society", "Clydesdale", 
+            "Coutts", "Cumberland", "Cynergy Bank", "Danske", "EBS", "First Direct", 
+            "Halifax", "Handelsbanken", "HSBC", "ICICI Bank UK", "Investec", "Kleinwort Hambros", 
+            "Lloyds", "M&S Bank", "Mettle", "Monzo", "Nationwide Building Society", "NatWest", 
+            "Revolut", "Royal Bank of Scotland", "Santander", "Silicon Valley Bank", "Smile", 
+            "Starling", "Tesco", "The Co-operative Bank", "Tide", "TSB Bank", "Ulster Bank", 
+            "Virgin Money", "Wise", "Yorkshire", "Yorkshire Building Society", "Zempler"
+        ].sort(); // Sorted alphabetically
+
+        // --- Fixed Bank List for Multi-Select ---
+        const BANK_LIST_FOR_MULTISELECT = [
+            "AIB (NI) Corporate", "AIB (NI) Personal", "Adam&Company", "Alpha FX",
+            "Allied Irish Bank GB Corporate", "Allied Irish Bank GB Personal", "Arbuthnot Latham & Co., Limited",
+            "Bank Of Ireland 365 Online UK", "Bank Of Ireland Business On Line", "Bank Of Scotland Business",
+            "Bank Of Scotland Commercial", "Bank Of Scotland Personal", "Barclaycard", "Barclaycard Mobile",
+            "Barclays", "Barclays Business", "Barclays Business Mobile", "Barclays Corporate", "Barclays Mobile",
+            "Barclays Wealth", "Barclays Wealth Mobile", "C. Hoare & Co.", "Capital One", "Cashplus",
+            "Cater Allen", "Chase", "Chelsea Building Society", "Clydesdale", "Coutts", "Cumberland",
+            "Cynergy Bank", "Danske", "Danske Business", "Danske Business ROI", "EBS ROI", "First Direct",
+            "Halifax", "Handelsbanken", "HSBC", "HSBC Business", "HSBC Kinetic", "HSBCnet", "ICICI Bank UK",
+            "Investec", "Kleinwort Hambros", "Lloyds Business", "Lloyds Commercial", "Lloyds Personal",
+            "M&S Bank", "Mettle", "Monzo", "Nationwide Building Society", "NatWest Bankline", "NatWest International EQ",
+            "NatWest International Online and Mobile Banking", "NatWest Online and Mobile Banking", "RBS Bankline",
+            "RBS International EQ", "RBS Online and Mobile Banking", "Revolut", "Santander", "Silicon Valley Bank",
+            "Smile", "Starling", "Starling (Old Version)", "Tesco", "The Co-operative Bank Business",
+            "The Co-operative Bank Personal", "Tide", "TSB Bank", "Ulster Bank NI Anytime Internet Banking",
+            "Ulster Bank NI Bankline", "Ulster Bank RoI", "Virgin Money", "Wise", "Yorkshire",
+            "Yorkshire Building Society", "Zempler"
+        ].sort();
+
+        // --- Multi-Select Logic ---
+        
+        // This Map holds the state for each row's selected banks. 
+        const rowSelections = new Map(); 
+
+        /**
+         * Filters the list of banks based on the search term.
+         * @param {HTMLInputElement} searchInput - The input element containing the search term.
+         */
+        function filterBankList(searchInput) {
+            const row = searchInput.closest('tr');
+            const searchTerm = searchInput.value.toLowerCase();
+            // Use the correct container for the list items
+            const itemsContainer = row.querySelector('.dropdown-items-container'); 
+            const items = itemsContainer.querySelectorAll('.dropdown-item');
+
+            items.forEach(item => {
+                const bankName = item.dataset.bankName.toLowerCase();
+                if (bankName.includes(searchTerm)) {
+                    item.classList.remove('hidden');
+                } else {
+                    item.classList.add('hidden');
+                }
+            });
+        }
+
+
+        /**
+         * Selects a bank name in the given row, updates the tags, and updates the hidden value.
+         * @param {HTMLElement} row - The table row element.
+         * @param {string} bankName - The bank name to select.
+         */
+        function selectBank(row, bankName) {
+            let selected = rowSelections.get(row) || [];
+            
+            // Do not add if already present (case-sensitive as per initial requirement)
+            if (selected.includes(bankName)) return; 
+            
+            selected.push(bankName);
+            rowSelections.set(row, selected);
+            
+            // 1. Update UI Tags
+            renderTags(row, selected);
+            
+            // 2. Update Hidden Input Value for CSV Export
+            updateHiddenInputValue(row, selected);
+            
+            // 3. Mark dropdown item as selected
+            const listItem = row.querySelector(`.dropdown-item[data-bank-name="${bankName}"]`);
+            if (listItem) listItem.classList.add('selected');
+        }
+
+        /**
+         * Removes a bank name from the selection in the given row.
+         * @param {HTMLElement} row - The table row element.
+         * @param {string} bankName - The bank name to remove.
+         */
+        function removeBank(row, bankName) {
+            let selected = rowSelections.get(row) || [];
+            
+            // Filter out the bank name
+            const newSelected = selected.filter(name => name !== bankName);
+            rowSelections.set(row, newSelected);
+
+            // 1. Update UI Tags
+            renderTags(row, newSelected);
+            
+            // 2. Update Hidden Input Value for CSV Export
+            updateHiddenInputValue(row, newSelected);
+            
+            // 3. Unmark dropdown item
+            const listItem = row.querySelector(`.dropdown-item[data-bank-name="${bankName}"]`);
+            if (listItem) listItem.classList.remove('selected');
+        }
+
+        /**
+         * Renders the pill-style tags based on the current selection.
+         * @param {HTMLElement} row - The table row element.
+         * @param {string[]} selected - Array of currently selected bank names.
+         */
+        function renderTags(row, selected) {
+            const tagContainer = row.querySelector('.tag-container');
+            const promptSpan = row.querySelector('.select-bank-prompt');
+            if (!tagContainer || !promptSpan) return;
+
+            tagContainer.innerHTML = selected.map(name => `
+                <div class="tag" data-bank-name="${name}">
+                    ${name}
+                    <span class="tag-remove" onclick="handleRemoveTag(this, '${name}')">&times;</span>
+                </div>
+            `).join('');
+
+            // Hide or show the prompt based on selection count
+            promptSpan.classList.toggle('hidden', selected.length > 0);
+        }
+        
+        /**
+         * Handler for the remove (x) button on a tag.
+         * @param {HTMLElement} element - The clicked element.
+         * @param {string} bankName - The bank name to remove.
+         */
+        function handleRemoveTag(element, bankName) {
+            // Find the row element
+            const row = element.closest('tr');
+            if (row) {
+                removeBank(row, bankName);
+            }
+        }
+        
+        /**
+         * Updates the hidden input field with the semicolon-separated string.
+         * @param {HTMLElement} row - The table row element.
+         * @param {string[]} selected - Array of currently selected bank names.
+         */
+        function updateHiddenInputValue(row, selected) {
+            const hiddenInput = row.querySelector('input.downtime-input[data-column="Bank"]');
+            if (hiddenInput) {
+                // Join with semicolon and NO space, as requested
+                hiddenInput.value = selected.join(';'); 
+            }
+        }
+
+        /**
+         * Toggles the visibility of the bank dropdown list.
+         * @param {HTMLElement} inputElement - The element clicked (the display input).
+         */
+        function toggleDropdown(inputElement) {
+            // Ensure we are operating on the actual selector container
+            const selectorContainer = inputElement.closest('[data-bank-selector-cell]');
+            if (!selectorContainer) return;
+            
+            const row = inputElement.closest('tr');
+            const dropdown = selectorContainer.querySelector('.dropdown-list');
+            const searchInput = selectorContainer.querySelector('.search-input');
+            
+            // Hide all other dropdowns first
+            document.querySelectorAll('.dropdown-list').forEach(d => {
+                if (d !== dropdown) d.classList.add('hidden');
+            });
+
+            // Toggle current dropdown visibility
+            dropdown.classList.toggle('hidden');
+
+            if (!dropdown.classList.contains('hidden')) {
+                // If opening, clear the search, reset the filter view, and focus the input
+                searchInput.value = '';
+                filterBankList(searchInput); 
+                searchInput.focus();
+            }
+        }
+        
+        /**
+         * Sets up the necessary event listeners for the multi-select box in a new row.
+         * @param {HTMLElement} newRow - The newly created row element.
+         */
+        function initializeMultiSelect(newRow) {
+            const bankCell = newRow.querySelector('[data-bank-selector-cell]');
+            const dropdown = newRow.querySelector('.dropdown-list');
+            
+            if (!bankCell || !dropdown) return;
+
+            // 1. Click Listener for the selection list
+            dropdown.addEventListener('click', (e) => {
+                const item = e.target.closest('.dropdown-item');
+                // Ensure we only process if the item is not hidden by the filter
+                if (item && !item.classList.contains('hidden')) { 
+                    const bankName = item.dataset.bankName;
+                    if (item.classList.contains('selected')) {
+                        removeBank(newRow, bankName);
+                    } else {
+                        selectBank(newRow, bankName);
+                    }
+                }
+            });
+
+            // 2. Click-away listener to hide the dropdown
+            document.addEventListener('click', (e => {
+                // Check if the click occurred outside the bank selector container
+                if (!bankCell.contains(e.target) && !dropdown.contains(e.target)) {
+                    // Check if the click was not on the search input itself to allow searching
+                    if (!e.target.classList.contains('search-input')) {
+                        dropdown.classList.add('hidden');
+                    }
+                }
+            }), true); // Use capturing phase
+        }
+
+        // --- Table Management Functions ---
+        
+        /**
+         * Creates the HTML structure for the 'BankGroup' dropdown input.
+         * @returns {string} The HTML string for the bank group select.
+         */
+        function createBankGroupInputHTML() {
+            const optionsHtml = BANK_GROUP_LIST.map(name => 
+                `<option value="${name}">${name}</option>`
+            ).join('');
+
+            return `
+                <select class="table-input downtime-input" data-column="BankGroup" required>
+                    <option value="" disabled selected>-- Select Bank Group --</option>
+                    ${optionsHtml}
+                </select>
+            `;
+        }
+
+
+        /**
+         * Creates the HTML structure for the 'Bank' multi-select selector WITH search.
+         * @returns {string} The HTML string for the bank selector cell.
+         */
+        function createBankInputHTML() {
+            // List items for the dropdown
+            const optionsHtml = BANK_LIST_FOR_MULTISELECT.map(name => 
+                `<div class="dropdown-item" data-bank-name="${name}">${name}</div>`
+            ).join('');
+
+            return `
+                <div class="relative w-full" data-bank-selector-cell>
+                    <!-- Hidden input to store the final semicolon-separated string for CSV export -->
+                    <input type="hidden" class="downtime-input" data-column="Bank" value="" required>
+
+                    <!-- Display area for selected tags and input/click area -->
+                    <div class="table-input flex flex-wrap items-center min-h-[44px] cursor-pointer" onclick="toggleDropdown(this)">
+                        <div class="tag-container flex flex-wrap items-center">
+                            <!-- Tags will be injected here by renderTags() -->
+                        </div>
+                        <span class="text-gray-400 text-sm ml-1 select-bank-prompt">Select Bank(s)...</span>
+                    </div>
+
+                    <!-- Dropdown List Container -->
+                    <div class="dropdown-list hidden absolute w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg">
+                        <!-- Search Input (Sticky Header) -->
+                        <div class="p-2 border-b border-gray-200 sticky top-0 bg-white z-10">
+                            <input type="text" 
+                                class="search-input table-input w-full p-2" 
+                                placeholder="Search banks..."
+                                oninput="filterBankList(this)">
+                        </div>
+                        <!-- Dropdown Items Container (Scrollable) -->
+                        <div class="dropdown-items-container">
+                            ${optionsHtml}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        /**
+         * Creates a new table row with all necessary inputs.
+         */
+        function addRow() {
+            const tbody = document.getElementById('tableBody');
+            const newRow = document.createElement('tr');
+            newRow.classList.add('hover:bg-gray-50', 'bg-white');
+
+            newRow.innerHTML = `
+                <!-- BankGroup (Dropdown Select - NEW) -->
+                <td>
+                    ${createBankGroupInputHTML()}
+                </td>
+                
+                <!-- Bank (Multi-Select Tag Selector) -->
+                <td>${createBankInputHTML()}</td>
+                
+                <!-- Schedule (Fixed: Planned) -->
+                <td><input type="text" class="table-input downtime-input bg-gray-100" data-column="Schedule" value="Planned" readonly></td>
+                
+                <!-- Subscribers (Dropdown: AIS, PIS, ALL) -->
+                <td>
+                    <select class="table-input downtime-input" data-column="Subscribers" required>
+                        <option value="" disabled selected>-- Select --</option>
+                        <option value="AIS">AIS</option>
+                        <option value="PIS">PIS</option>
+                        <option value="ALL">ALL</option>
+                    </select>
+                </td>
+                
+                <!-- NotificationDate (Fixed: Blank) -->
+                <td><input type="text" class="table-input downtime-input bg-gray-100" data-column="NotificationDate" value="" readonly></td>
+                
+                <!-- StartDate (User Input: Date/Time) -->
+                <td><input type="text" class="table-input downtime-input" data-column="StartDate" placeholder="10/1/2026 10:00 PM" required></td>
+                
+                <!-- EndDate (User Input: Date/Time) -->
+                <td><input type="text" class="table-input downtime-input" data-column="EndDate" placeholder="10/1/2026 10:00 PM" required></td>
+                
+                <!-- Severity (Fixed: CompletelyDown) -->
+                <td><input type="text" class="table-input downtime-input bg-gray-100" data-column="Severity" value="CompletelyDown" readonly></td>
+                
+                <!-- Content (User Input: Long Text) -->
+                <td><textarea rows="2" class="table-input downtime-input" data-column="Content" placeholder="Detailed description of downtime..." required></textarea></td>
+
+                <!-- Actions (Delete Button) -->
+                <td class="text-center">
+                    <button onclick="deleteRow(this)" class="p-2 text-red-500 hover:text-red-700 transition duration-150 rounded-full hover:bg-red-50" title="Delete Row">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 10-2 0v6a1 1 0 102 0V8z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                </td>
+            `;
+            tbody.appendChild(newRow);
+            
+            // Initialize the new multi-select logic
+            initializeMultiSelect(newRow);
+        }
+
+        /**
+         * Deletes the parent row of the clicked button.
+         * @param {HTMLButtonElement} buttonElement - The delete button element.
+         */
+        function deleteRow(buttonElement) {
+            const row = buttonElement.closest('tr');
+            if (row) {
+                // Clean up state associated with the row
+                rowSelections.delete(row); 
+                row.remove();
+            }
+        }
+
+        /**
+         * Collects all data from the table and exports it as a CSV file.
+         */
+        function exportCSV() {
+            const tableBody = document.getElementById('tableBody');
+            const rows = tableBody.querySelectorAll('tr');
+
+            if (rows.length === 0) {
+                console.error("No data to export.");
+                return;
+            }
+
+            // 1. Define CSV Header (must match user requirements and column order)
+            const headers = [
+                "BankGroup", "Bank", "Schedule", "Subscribers", "NotificationDate", 
+                "StartDate", "EndDate", "Severity", "Content"
+            ];
+            let csvContent = headers.join(",") + "\n";
+
+            // 2. Data Collection Loop
+            rows.forEach(row => {
+                const rowData = {};
+                
+                // Get all inputs/selects in the current row
+                const inputs = row.querySelectorAll('.downtime-input');
+
+                inputs.forEach(input => {
+                    const column = input.dataset.column;
+                    let value = input.value;
+                    
+                    // Sanitize values for CSV: double up double quotes, and enclose the whole string in quotes
+                    value = String(value).replace(/"/g, '""'); 
+                    rowData[column] = `"${value}"`;
+                });
+
+                // 3. Construct CSV Row in the correct order
+                // Ensure all headers are present, using an empty string if data is missing
+                const rowValues = headers.map(header => rowData[header] || ""); 
+                csvContent += rowValues.join(",") + "\n";
+            });
+
+            // 4. Trigger Download
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            if (link.download !== undefined) { 
+                const url = URL.createObjectURL(blob);
+                link.setAttribute("href", url);
+                link.setAttribute("download", "bank_downtime_log_" + new Date().toISOString().slice(0, 10) + ".csv");
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url); // Clean up
+            }
+        }
+
+        // Initialize the table with one empty row on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            addRow();
+        });
+
+    </script>
+</body>
+</html>
