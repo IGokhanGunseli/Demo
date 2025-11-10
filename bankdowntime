@@ -159,8 +159,8 @@
                             <th class="py-3 px-2 text-left min-w-[100px]">Schedule</th>
                             <th class="py-3 px-2 text-left min-w-[120px]">Subscribers</th>
                             <th class="py-3 px-2 text-left min-w-[150px]">NotificationDate</th>
-                            <th class="py-3 px-2 text-left min-w-[200px]">StartDate (MM/DD/YYYY HH:MM AM/PM)</th>
-                            <th class="py-3 px-2 text-left min-w-[200px]">EndDate (MM/DD/YYYY HH:MM AM/PM)</th>
+                            <th class="py-3 px-2 text-left min-w-[200px]">StartDate (DD/MM/YYYY HH:MM AM/PM)</th>
+                            <th class="py-3 px-2 text-left min-w-[200px]">EndDate (DD/MM/YYYY HH:MM AM/PM)</th>
                             <th class="py-3 px-2 text-left min-w-[150px]">Severity</th>
                             <th class="py-3 px-2 text-left w-full min-w-[300px]">Content (Description)</th>
                             <th class="py-3 px-2 text-center w-12">Actions</th>
